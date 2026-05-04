@@ -1,4 +1,4 @@
-package com.ensias.crowdfunding_project.; // Assure-t-il que ce package correspond à ton dossier
+package com.ensias.crowdfunding_project; // Assure-t-il que ce package correspond à ton dossier
 
 import com.ensias.crowdfunding_project.entities.Utilisateur;
 import com.ensias.crowdfunding_project.repositories.UtilisateurRepository;
