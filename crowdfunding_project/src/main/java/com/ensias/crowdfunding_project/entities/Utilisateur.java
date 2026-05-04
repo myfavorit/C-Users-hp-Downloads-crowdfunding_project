@@ -2,8 +2,8 @@ package com.ensias.crowdfunding_project.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,22 +17,22 @@ public class Utilisateur {
     @Column(name = "id", columnDefinition = "BINARY(16)", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String nom;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String prenom;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "mot_de_passe_hash")
+    @Column(name = "mot_de_passe_hash", length = 255)
     private String motDePasseHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    @Builder.Default
-    private Role role = Role.INVESTOR;
+    // ⚠️ Retirez @Builder.Default si le rôle est choisi à l'inscription
+    private Role role;  // Plus de valeur par défaut
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -40,16 +40,16 @@ public class Utilisateur {
     private StatutCompte statut = StatutCompte.ACTIF;
 
     // --- OTP & OAuth ---
-    @Column(name = "otp_code")
+    @Column(name = "otp_code", length = 255)
     private String otpCode;
 
     @Column(name = "otp_expiration")
     private LocalDateTime otpExpiration;
 
-    @Column(name = "oauth_provider")
+    @Column(name = "oauth_provider", length = 255)
     private String oauthProvider;
 
-    @Column(name = "oauth_id")
+    @Column(name = "oauth_id", length = 255)
     private String oauthId;
 
     // --- Audit ---
@@ -69,93 +69,87 @@ public class Utilisateur {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // --- Relations ---
+    // --- Relations avec orphanRemoval ---
     @OneToOne(mappedBy = "utilisateur", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private ProfilKyc profilKyc;
 
-    @OneToMany(mappedBy = "porteur")
-    private List<Projet> projets;
+    @OneToMany(mappedBy = "porteur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Projet> projets = new ArrayList<>();
 
-    @OneToMany(mappedBy = "investisseur")
-    private List<Investissement> investissements;
+    @OneToMany(mappedBy = "investisseur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Investissement> investissements = new ArrayList<>();
 
-    @OneToMany(mappedBy = "destinataire", cascade = CascadeType.ALL)
-    private List<Notification> notifications;
+    @OneToMany(mappedBy = "destinataire", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Notification> notifications = new ArrayList<>();
 
-    @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL)
-    private List<Favori> favoris;
+    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Favori> favoris = new ArrayList<>();
 
-    @OneToMany(mappedBy = "auteur")
-    private List<Commentaires> commentaires;
+    @OneToMany(mappedBy = "auteur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Commentaires> commentaires = new ArrayList<>();
 
     // --- Enums Internes ---
     public enum Role {
-        INVESTOR,
-        PROJECT_CREATOR,
-        ADMIN
+        INVESTOR, PROJECT_CREATOR, ADMIN
     }
 
     public enum StatutCompte {
-        ACTIF,
-        SUSPENDU,
-        BANNI
+        ACTIF, SUSPENDU, BANNI
     }
 
     // --- Helpers Métier ---
 
-    /**
-     * Vérifie si l'utilisateur a un profil KYC validé
-     */
-    private boolean hasKycValide() {
+    public boolean hasKycValide() {
         return profilKyc != null && profilKyc.isKycValide();
     }
 
-    /**
-     * Vérifie si l'utilisateur est un administrateur
-     */
     public boolean isAdmin() {
         return this.role == Role.ADMIN;
     }
 
-    /**
-     * Vérifie si l'utilisateur peut investir dans un projet
-     * Conditions : compte actif + KYC validé + (INVESTOR ou PROJECT_CREATOR)
-     */
+    public boolean isProjectCreator() {
+        return this.role == Role.PROJECT_CREATOR;
+    }
+
+    public boolean isInvestor() {
+        return this.role == Role.INVESTOR;
+    }
+
     public boolean peutInvestir() {
         return this.statut == StatutCompte.ACTIF
                 && hasKycValide()
                 && (this.role == Role.INVESTOR || this.role == Role.PROJECT_CREATOR);
     }
 
-    /**
-     * Vérifie si l'utilisateur peut créer un projet
-     * Conditions : compte actif + KYC validé + ROLE PROJECT_CREATOR uniquement
-     */
     public boolean peutCreerProjet() {
         return this.statut == StatutCompte.ACTIF
                 && hasKycValide()
                 && this.role == Role.PROJECT_CREATOR;
     }
 
-    /**
-     * Vérifie si l'utilisateur peut valider des KYC (seul l'admin)
-     */
     public boolean peutValiderKyc() {
         return this.statut == StatutCompte.ACTIF && this.role == Role.ADMIN;
     }
 
-    /**
-     * Vérifie si le profil KYC est soumis mais pas encore validé
-     */
     public boolean isKycEnAttente() {
         return profilKyc != null && !profilKyc.isKycValide();
     }
 
-    /**
-     * Vérifie si l'utilisateur a soumis son KYC
-     */
     public boolean aSoumisKyc() {
         return profilKyc != null;
+    }
+
+    public boolean isActif() {
+        return this.statut == StatutCompte.ACTIF;
+    }
+
+    public boolean isOAuthUser() {
+        return this.motDePasseHash == null && this.oauthId != null;
     }
 
     @Override

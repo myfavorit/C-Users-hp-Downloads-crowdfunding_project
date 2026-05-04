@@ -1,6 +1,10 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Utilisateur;
+import com.ensias.crowdfunding_project.entities.Utilisateur.Role;
+import com.ensias.crowdfunding_project.entities.Utilisateur.StatutCompte;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,25 +20,36 @@ import java.util.UUID;
 @Repository
 public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> {
 
-    // ── Recherche par email ───────────────────────────────────
+    // 1. RECHERCHES DE BASE (5 méthodes)
 
-    // Pour login
+    // Recherche par email (login)
     Optional<Utilisateur> findByEmail(String email);
 
-    // Pour inscription — vérifier unicité
+    // Vérifier unicité email (inscription)
     boolean existsByEmail(String email);
 
-    // ── Recherche par OAuth ───────────────────────────────────
+    // Recherche par OAuth (Google/Facebook)
+    Optional<Utilisateur> findByOauthProviderAndOauthId(String oauthProvider, String oauthId);
 
-    // Pour login Google / Facebook
-    Optional<Utilisateur> findByOauthProviderAndOauthId(
-            String oauthProvider,
-            String oauthId
-    );
+    // Recherche par rôle
+    List<Utilisateur> findByRole(Role role);
 
-    // ── Recherche par OTP ─────────────────────────────────────
+    // Recherche par statut
+    List<Utilisateur> findByStatut(StatutCompte statut);
 
-    // Recherche OTP avec vérification expiration
+    // 2. RECHERCHES AVEC PAGINATION (4 méthodes)
+
+    // Pagination par rôle
+    Page<Utilisateur> findByRole(Role role, Pageable pageable);
+
+    // Pagination par statut
+    Page<Utilisateur> findByStatut(StatutCompte statut, Pageable pageable);
+
+    // Pagination par rôle ET statut (le plus utilisé)
+    Page<Utilisateur> findByRoleAndStatut(Role role, StatutCompte statut, Pageable pageable);
+
+    // 3. RECHERCHE PAR OTP (1 méthode)
+
     @Query("SELECT u FROM Utilisateur u " +
             "WHERE u.email = :email " +
             "AND u.otpCode = :otpCode " +
@@ -44,44 +59,62 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
             @Param("otpCode") String otpCode,
             @Param("now") LocalDateTime now
     );
+    // 4. RECHERCHE PAR NOM/TEXT (barre de recherche) - 2 méthodes
 
-    // ── Recherche par rôle ────────────────────────────────────
+    // Recherche simple (sans pagination)
+    @Query("SELECT u FROM Utilisateur u WHERE " +
+            "LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
+    List<Utilisateur> searchUsers(@Param("search") String search);
 
-    // role : INVESTOR | PROJECT_CREATOR | ADMIN
-    List<Utilisateur> findByRole(String role);
+    // Recherche AVEC pagination
+    @Query("SELECT u FROM Utilisateur u WHERE " +
+            "LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Utilisateur> searchUsersPaged(@Param("search") String search, Pageable pageable);
 
-    // ── Recherche par statut ──────────────────────────────────
+    // 5. GESTION KYC (2 méthodes)
 
-    // statut : actif | suspendu | banni
-    List<Utilisateur> findByStatut(String statut);
+    // Utilisateurs avec KYC validé
+    @Query("SELECT u FROM Utilisateur u WHERE u.profilKyc IS NOT NULL AND u.profilKyc.kycValide = true")
+    List<Utilisateur> findUsersWithValidKyc();
 
-    // ── Mises à jour ─────────────────────────────────────────
+    // Utilisateurs avec KYC en attente (soumis mais non validé)
+    @Query("SELECT u FROM Utilisateur u WHERE u.profilKyc IS NOT NULL AND u.profilKyc.kycValide = false")
+    List<Utilisateur> findUsersWithPendingKyc();
 
-    // Changer le statut d'un utilisateur (actif/suspendu/banni)
+    // 6. MISES À JOUR (4 méthodes)
+
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.statut = :statut WHERE u.id = :id")
-    int updateStatut(@Param("id") UUID id, @Param("statut") String statut);
+    int updateStatut(@Param("id") UUID id, @Param("statut") StatutCompte statut);
 
-    // Effacer OTP après validation
     @Modifying
     @Transactional
-    @Query("UPDATE Utilisateur u SET u.otpCode = null, " +
-            "u.otpExpiration = null WHERE u.id = :id")
+    @Query("UPDATE Utilisateur u SET u.role = :role WHERE u.id = :id")
+    int updateRole(@Param("id") UUID id, @Param("role") Role role);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null WHERE u.id = :id")
     int clearOtp(@Param("id") UUID id);
 
-    // Reset mot de passe
     @Modifying
     @Transactional
-    @Query("UPDATE Utilisateur u SET u.motDePasseHash = :hash " +
-            "WHERE u.id = :id")
+    @Query("UPDATE Utilisateur u SET u.motDePasseHash = :hash WHERE u.id = :id")
     int updateMotDePasse(@Param("id") UUID id, @Param("hash") String hash);
 
-    // ── Statistiques ──────────────────────────────────────────
+    // 7. STATISTIQUES (2 méthodes)
+    // Répartition des rôles (dashboard)
+    @Query("SELECT u.role, COUNT(u) FROM Utilisateur u GROUP BY u.role")
+    List<Object[]> countUsersByRole();
 
-    // Compter par rôle — dashboard admin
-    long countByRole(String role);
-
-    // Compter par statut — dashboard admin
-    long countByStatut(String statut);
+    // Nettoyage OTP expirés (job programmé)
+    @Modifying
+    @Transactional
+    @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null WHERE u.otpExpiration < :now")
+    int clearExpiredOtps(@Param("now") LocalDateTime now);
 }
