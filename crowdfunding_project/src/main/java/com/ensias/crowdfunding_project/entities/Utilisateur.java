@@ -31,8 +31,9 @@ public class Utilisateur {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    // ⚠️ Retirez @Builder.Default si le rôle est choisi à l'inscription
-    private Role role;  // Plus de valeur par défaut
+    @Builder.Default
+    private Role role = Role.INVESTOR;
+// Plus de valeur par défaut
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -73,23 +74,24 @@ public class Utilisateur {
     @OneToOne(mappedBy = "utilisateur", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private ProfilKyc profilKyc;
 
-    @OneToMany(mappedBy = "porteur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+
+    @OneToMany(mappedBy = "porteur", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Projet> projets = new ArrayList<>();
 
-    @OneToMany(mappedBy = "investisseur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "investisseur", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Investissement> investissements = new ArrayList<>();
 
-    @OneToMany(mappedBy = "destinataire", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "destinataire", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Notification> notifications = new ArrayList<>();
 
-    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "utilisateur", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Favori> favoris = new ArrayList<>();
 
-    @OneToMany(mappedBy = "auteur", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "auteur", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Commentaires> commentaires = new ArrayList<>();
 
