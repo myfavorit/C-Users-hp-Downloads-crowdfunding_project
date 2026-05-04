@@ -2,7 +2,6 @@ package com.ensias.crowdfunding_project.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,8 +13,7 @@ import java.util.UUID;
 public class Utilisateur {
 
     @Id
-    @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", columnDefinition = "BINARY(16)", updatable = false, nullable = false)
     private UUID id;
 
@@ -34,7 +32,7 @@ public class Utilisateur {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private Role role = Role.USER;
+    private Role role = Role.INVESTOR;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -62,12 +60,16 @@ public class Utilisateur {
     private LocalDateTime updatedAt;
 
     @PrePersist
-    protected void onCreate() { this.createdAt = LocalDateTime.now(); }
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     @PreUpdate
-    protected void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
-    // --- Relations (Une seule déclaration par relation !) ---
+    // --- Relations ---
     @OneToOne(mappedBy = "utilisateur", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private ProfilKyc profilKyc;
 
@@ -86,34 +88,85 @@ public class Utilisateur {
     @OneToMany(mappedBy = "auteur")
     private List<Commentaires> commentaires;
 
-    // --- Enums ---
-    public enum Role { USER, ADMIN }
-    public enum StatutCompte { ACTIF, SUSPENDU }
+    // --- Enums Internes ---
+    public enum Role {
+        INVESTOR,
+        PROJECT_CREATOR,
+        ADMIN
+    }
 
-    // --- Helpers Métier (Logique de validation) ---
+    public enum StatutCompte {
+        ACTIF,
+        SUSPENDU,
+        BANNI
+    }
 
+    // --- Helpers Métier ---
+
+    /**
+     * Vérifie si l'utilisateur a un profil KYC validé
+     */
+    private boolean hasKycValide() {
+        return profilKyc != null && profilKyc.isKycValide();
+    }
+
+    /**
+     * Vérifie si l'utilisateur est un administrateur
+     */
     public boolean isAdmin() {
         return this.role == Role.ADMIN;
     }
 
     /**
-     * Vérifie si le KYC est présent dans la table liée et s'il a été validé.
-     */
-    public boolean hasKycValide() {
-        return this.profilKyc != null && this.profilKyc.isKycValide();
-    }
-
-    /**
-     * Condition pour investir : Compte non suspendu ET identité vérifiée (KYC).
+     * Vérifie si l'utilisateur peut investir dans un projet
+     * Conditions : compte actif + KYC validé + (INVESTOR ou PROJECT_CREATOR)
      */
     public boolean peutInvestir() {
-        return this.statut == StatutCompte.ACTIF && hasKycValide();
+        return this.statut == StatutCompte.ACTIF
+                && hasKycValide()
+                && (this.role == Role.INVESTOR || this.role == Role.PROJECT_CREATOR);
     }
 
     /**
-     * Pour créer un projet, on applique généralement les mêmes règles de sécurité.
+     * Vérifie si l'utilisateur peut créer un projet
+     * Conditions : compte actif + KYC validé + ROLE PROJECT_CREATOR uniquement
      */
     public boolean peutCreerProjet() {
-        return peutInvestir();
+        return this.statut == StatutCompte.ACTIF
+                && hasKycValide()
+                && this.role == Role.PROJECT_CREATOR;
+    }
+
+    /**
+     * Vérifie si l'utilisateur peut valider des KYC (seul l'admin)
+     */
+    public boolean peutValiderKyc() {
+        return this.statut == StatutCompte.ACTIF && this.role == Role.ADMIN;
+    }
+
+    /**
+     * Vérifie si le profil KYC est soumis mais pas encore validé
+     */
+    public boolean isKycEnAttente() {
+        return profilKyc != null && !profilKyc.isKycValide();
+    }
+
+    /**
+     * Vérifie si l'utilisateur a soumis son KYC
+     */
+    public boolean aSoumisKyc() {
+        return profilKyc != null;
+    }
+
+    @Override
+    public String toString() {
+        return "Utilisateur{" +
+                "id=" + id +
+                ", nom='" + nom + '\'' +
+                ", prenom='" + prenom + '\'' +
+                ", email='" + email + '\'' +
+                ", role=" + role +
+                ", statut=" + statut +
+                '}';
     }
 }
