@@ -20,24 +20,29 @@ import java.util.UUID;
 @Repository
 public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> {
 
-    // 1. RECHERCHES DE BASE (5 méthodes)
+    // ── 1. RECHERCHES DE BASE ─────────────────────────────────
 
-    // Recherche par email (login)
+    // Recherche par email — login
     Optional<Utilisateur> findByEmail(String email);
 
-    // Vérifier unicité email (inscription)
+    // Vérifier unicité email — inscription
     boolean existsByEmail(String email);
 
-    // Recherche par OAuth (Google/Facebook)
-    Optional<Utilisateur> findByOauthProviderAndOauthId(String oauthProvider, String oauthId);
+    // Recherche par OAuth — Google / Facebook
+    Optional<Utilisateur> findByOauthProviderAndOauthId(
+            String oauthProvider, String oauthId
+    );
 
     // Recherche par rôle
-    List<Utilisateur> findByRole(Role role);
+    List<Utilisateur> findByRole(Role role);  // ← CORRIGÉ (sans "All")
 
     // Recherche par statut
     List<Utilisateur> findByStatut(StatutCompte statut);
 
-    // 2. RECHERCHES AVEC PAGINATION (4 méthodes)
+    // Recherche par email ET rôle — vérification accès
+    Optional<Utilisateur> findByEmailAndRole(String email, Role role);
+
+    // ── 2. RECHERCHES AVEC PAGINATION ─────────────────────────
 
     // Pagination par rôle
     Page<Utilisateur> findByRole(Role role, Pageable pageable);
@@ -45,10 +50,12 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     // Pagination par statut
     Page<Utilisateur> findByStatut(StatutCompte statut, Pageable pageable);
 
-    // Pagination par rôle ET statut (le plus utilisé)
-    Page<Utilisateur> findByRoleAndStatut(Role role, StatutCompte statut, Pageable pageable);
+    // Pagination par rôle ET statut — le plus utilisé
+    Page<Utilisateur> findByRoleAndStatut(
+            Role role, StatutCompte statut, Pageable pageable
+    );
 
-    // 3. RECHERCHE PAR OTP (1 méthode)
+    // ── 3. RECHERCHE PAR OTP ──────────────────────────────────
 
     @Query("SELECT u FROM Utilisateur u " +
             "WHERE u.email = :email " +
@@ -59,33 +66,40 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
             @Param("otpCode") String otpCode,
             @Param("now") LocalDateTime now
     );
-    // 4. RECHERCHE PAR NOM/TEXT (barre de recherche) - 2 méthodes
 
-    // Recherche simple (sans pagination)
+    // ── 4. RECHERCHE PAR NOM / TEXTE ─────────────────────────
+
+    // Recherche simple — sans pagination
     @Query("SELECT u FROM Utilisateur u WHERE " +
             "LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
     List<Utilisateur> searchUsers(@Param("search") String search);
 
-    // Recherche AVEC pagination
+    // Recherche avec pagination
     @Query("SELECT u FROM Utilisateur u WHERE " +
             "LOWER(u.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(u.prenom) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
-    Page<Utilisateur> searchUsersPaged(@Param("search") String search, Pageable pageable);
+    Page<Utilisateur> searchUsersPaged(
+            @Param("search") String search, Pageable pageable
+    );
 
-    // 5. GESTION KYC (2 méthodes)
+    // ── 5. GESTION KYC ────────────────────────────────────────
 
     // Utilisateurs avec KYC validé
-    @Query("SELECT u FROM Utilisateur u WHERE u.profilKyc IS NOT NULL AND u.profilKyc.kycValide = true")
+    @Query("SELECT u FROM Utilisateur u WHERE EXISTS " +
+            "(SELECT p FROM ProfilKyc p WHERE p.utilisateur = u " +
+            "AND p.kycValide = true)")
     List<Utilisateur> findUsersWithValidKyc();
 
-    // Utilisateurs avec KYC en attente (soumis mais non validé)
-    @Query("SELECT u FROM Utilisateur u WHERE u.profilKyc IS NOT NULL AND u.profilKyc.kycValide = false")
+    // Utilisateurs avec KYC soumis mais non validé
+    @Query("SELECT u FROM Utilisateur u WHERE EXISTS " +
+            "(SELECT p FROM ProfilKyc p WHERE p.utilisateur = u " +
+            "AND p.kycValide = false AND p.kycSoumisAt IS NOT NULL)")
     List<Utilisateur> findUsersWithPendingKyc();
 
-    // 6. MISES À JOUR (4 méthodes)
+    // ── 6. MISES À JOUR ───────────────────────────────────────
 
     @Modifying
     @Transactional
@@ -107,12 +121,22 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     @Query("UPDATE Utilisateur u SET u.motDePasseHash = :hash WHERE u.id = :id")
     int updateMotDePasse(@Param("id") UUID id, @Param("hash") String hash);
 
-    // 7. STATISTIQUES (2 méthodes)
-    // Répartition des rôles (dashboard)
-    @Query("SELECT u.role, COUNT(u) FROM Utilisateur u GROUP BY u.role")
-    List<Object[]> countUsersByRole();
+    // ── 7. STATISTIQUES ───────────────────────────────────────
 
-    // Nettoyage OTP expirés (job programmé)
+    // Répartition des rôles — dashboard admin
+    @Query("SELECT u.role AS role, COUNT(u) AS total " +
+            "FROM Utilisateur u GROUP BY u.role")
+    List<RoleCount> countUsersByRole();
+
+    // Interface de projection
+    interface RoleCount {
+        Role getRole();
+        Long getTotal();
+    }
+
+    // ── 8. MAINTENANCE ────────────────────────────────────────
+
+    // Nettoyage OTP expirés — appelé par un @Scheduled job
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null WHERE u.otpExpiration < :now")
