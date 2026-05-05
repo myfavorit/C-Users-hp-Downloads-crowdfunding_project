@@ -1,6 +1,7 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Validation;
+import com.ensias.crowdfunding_project.entities.Validation.Decision;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,46 +14,64 @@ import java.util.UUID;
 @Repository
 public interface ValidationRepository extends JpaRepository<Validation, UUID> {
 
-    // ── Recherche par projet ──────────────────────────────────
+    // ============================================================
+    // 1. RECHERCHES PAR PROJET
+    // ============================================================
 
-    // Historique complet des décisions pour un projet
-    List<Validation> findByProjetIdOrderByDecidedAtDesc(UUID projetId);
-
-    // Dernière décision prise sur un projet
+    /**
+     * Dernière décision prise sur un projet
+     */
     Optional<Validation> findTopByProjetIdOrderByDecidedAtDesc(UUID projetId);
 
-    // Vérifier si un projet a déjà été approuvé
-    boolean existsByProjetIdAndDecision(UUID projetId, String decision);
+    /**
+     * Vérifier si un projet a déjà été validé
+     */
+    boolean existsByProjetIdAndDecision(UUID projetId, Decision decision);
 
-    // ── Recherche par admin ───────────────────────────────────
+    /**
+     * Vérifier si un projet a une validation (peu importe la décision)
+     */
+    boolean existsByProjetId(UUID projetId);
 
-    // Toutes les décisions d un admin
+    /**
+     * Trouver la validation d'un projet avec détails admin et projet (évite N+1)
+     */
+    @Query("SELECT v FROM Validation v " +
+            "JOIN FETCH v.admin " +
+            "JOIN FETCH v.projet " +
+            "WHERE v.projet.id = :projetId")
+    Optional<Validation> findByProjetIdWithDetails(@Param("projetId") UUID projetId);
+
+    // ============================================================
+    // 2. RECHERCHES PAR ADMIN
+    // ============================================================
+
+    /**
+     * Toutes les décisions d'un admin (triées du plus récent au plus ancien)
+     */
     List<Validation> findByAdminIdOrderByDecidedAtDesc(UUID adminId);
 
-    // ── Requêtes personnalisées ───────────────────────────────
-
-    // Dernières validations d un projet avec décision spécifique
-    @Query("SELECT v FROM Validation v " +
-            "WHERE v.projet.id = :projetId " +
-            "AND v.decision = :decision " +
-            "ORDER BY v.decidedAt DESC")
-    List<Validation> findByProjetIdAndDecision(
-            @Param("projetId") UUID projetId,
-            @Param("decision") String decision
-    );
-
-    // Validations d un admin avec détails projet — évite N+1
-    @Query("SELECT v FROM Validation v " +
-            "JOIN FETCH v.projet " +
-            "WHERE v.admin.id = :adminId " +
-            "ORDER BY v.decidedAt DESC")
+    /**
+     * Décisions d'un admin avec détails projet (évite N+1)
+     */
+    @Query("SELECT v FROM Validation v JOIN FETCH v.projet WHERE v.admin.id = :adminId ORDER BY v.decidedAt DESC")
     List<Validation> findByAdminIdWithProjet(@Param("adminId") UUID adminId);
 
-    // ── Statistiques admin ────────────────────────────────────
+    // ============================================================
+    // 3. STATISTIQUES (Dashboard Admin)
+    // ============================================================
 
-    @Query("SELECT COUNT(v) FROM Validation v WHERE v.decision = 'approuve'")
-    long countApprobations();
+    /**
+     * Nombre total de validations par décision
+     */
+    long countByDecision(Decision decision);
 
-    @Query("SELECT COUNT(v) FROM Validation v WHERE v.decision = 'refuse'")
-    long countRefus();
+    /**
+     * Taux d'approbation des projets (protégé contre division par zéro)
+     */
+    @Query("SELECT CASE WHEN COUNT(v) = 0 THEN 0.0 " +
+            "ELSE CAST(COUNT(CASE WHEN v.decision = 'VALIDE' THEN 1 END) AS double) / " +
+            "CAST(COUNT(v) AS double) * 100 END " +
+            "FROM Validation v")
+    Double getTauxApprobation();
 }
