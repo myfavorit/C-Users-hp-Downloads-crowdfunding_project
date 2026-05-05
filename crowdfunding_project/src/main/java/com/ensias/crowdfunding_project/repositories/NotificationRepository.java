@@ -1,6 +1,9 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Notification;
+import com.ensias.crowdfunding_project.entities.Notification.TypeNotification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,62 +17,89 @@ import java.util.UUID;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
-    // ── Recherche par Destinataire ──────────────────────────────
+    // ============================================================
+    // 1. RECHERCHES PAR DESTINATAIRE
+    // ============================================================
 
-    // Toutes les notifications d'un utilisateur triées par les plus récentes
+    /**
+     * Toutes les notifications d'un utilisateur (triées du plus récent au plus ancien)
+     */
     List<Notification> findByDestinataireIdOrderByCreatedAtDesc(UUID destinataireId);
 
-    // Notifications filtrées par statut de lecture (lu/non lu)
-    List<Notification> findByDestinataireIdAndLuOrderByCreatedAtDesc(UUID destinataireId, Boolean lu);
+    /**
+     * Notifications d'un utilisateur avec pagination (pour éviter de tout charger)
+     */
+    Page<Notification> findByDestinataireIdOrderByCreatedAtDesc(UUID destinataireId, Pageable pageable);
 
-    // ── Requêtes Spécifiques (JPQL) ──────────────────────────────
+    /**
+     * Notifications filtrées par statut de lecture
+     */
+    List<Notification> findByDestinataireIdAndLuOrderByCreatedAtDesc(UUID destinataireId, boolean lu);
 
-    // Récupérer uniquement les notifications non lues d'un utilisateur
-    @Query("SELECT n FROM Notification n " +
-            "WHERE n.destinataire.id = :destinataireId " +
-            "AND n.lu = false " +
-            "ORDER BY n.createdAt DESC")
-    List<Notification> findUnreadByDestinataireId(@Param("destinataireId") UUID destinataireId);
+    /**
+     * Notifications non lues d'un utilisateur
+     */
+    List<Notification> findByDestinataireIdAndLuFalseOrderByCreatedAtDesc(UUID destinataireId);
 
-    // Récupérer les notifications par type (ex: 'INVESTISSEMENT', 'SYSTEME')
-    @Query("SELECT n FROM Notification n " +
-            "WHERE n.destinataire.id = :destinataireId " +
-            "AND n.type = :type " +
-            "ORDER BY n.createdAt DESC")
-    List<Notification> findByTypeAndDestinataireId(
-            @Param("destinataireId") UUID destinataireId,
-            @Param("type") String type
-    );
+    // ============================================================
+    // 2. RECHERCHES PAR TYPE
+    // ============================================================
 
-    // ── Actions de Mise à Jour (Bulk) ───────────────────────────
+    /**
+     * Notifications d'un utilisateur par type
+     */
+    List<Notification> findByDestinataireIdAndTypeOrderByCreatedAtDesc(UUID destinataireId, TypeNotification type);
 
-    // Marquer toutes les notifications d'un utilisateur comme lues
+    // ============================================================
+    // 3. MISES À JOUR
+    // ============================================================
+
+    /**
+     * Marquer toutes les notifications d'un utilisateur comme lues
+     */
     @Modifying
     @Transactional
-    @Query("UPDATE Notification n SET n.lu = true " +
-            "WHERE n.destinataire.id = :destinataireId " +
-            "AND n.lu = false")
-    int markAllAsRead(@Param("destinataireId") UUID destinataireId);
+    @Query("UPDATE Notification n SET n.lu = true WHERE n.destinataire.id = :destinataireId AND n.lu = false")
+    int marquerToutCommeLu(@Param("destinataireId") UUID destinataireId);
 
-    // Marquer une notification spécifique comme lue
+    /**
+     * Marquer une notification spécifique comme lue
+     */
     @Modifying
     @Transactional
-    @Query("UPDATE Notification n SET n.lu = true " +
-            "WHERE n.id = :notificationId")
-    void markAsRead(@Param("notificationId") UUID notificationId);
+    @Query("UPDATE Notification n SET n.lu = true WHERE n.id = :notificationId")
+    int marquerCommeLue(@Param("notificationId") UUID notificationId);
 
-    // ── Suppression ──────────────────────────────────────────────
+    // ============================================================
+    // 4. SUPPRESSION
+    // ============================================================
 
-    // Supprimer les notifications très anciennes (ménage de la base)
+    /**
+     * Supprimer toutes les notifications d'un utilisateur (quand compte supprimé)
+     */
     @Modifying
     @Transactional
     void deleteByDestinataireId(UUID destinataireId);
 
-    // ── Statistiques ─────────────────────────────────────────────
+    /**
+     * Supprimer les notifications plus anciennes que X jours (job programmé)
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Notification n WHERE n.createdAt < :date")
+    int deleteOldNotifications(@Param("date") java.time.LocalDateTime date);
 
-    // Compter le nombre de notifications non lues (pour afficher la pastille rouge sur le profil)
+    // ============================================================
+    // 5. STATISTIQUES
+    // ============================================================
+
+    /**
+     * Compter les notifications non lues d'un utilisateur (pastille rouge)
+     */
     long countByDestinataireIdAndLuFalse(UUID destinataireId);
 
-    // Compter le total des notifications d'un utilisateur
+    /**
+     * Compter le total des notifications d'un utilisateur
+     */
     long countByDestinataireId(UUID destinataireId);
 }
