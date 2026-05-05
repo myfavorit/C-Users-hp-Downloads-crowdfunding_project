@@ -1,6 +1,7 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Projet;
+import com.ensias.crowdfunding_project.entities.Projet.StatutProjet;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,98 +18,116 @@ import java.util.UUID;
 @Repository
 public interface ProjetRepository extends JpaRepository<Projet, UUID> {
 
-    // ── Recherche par porteur ─────────────────────────────────
-    List<Projet> findByPorteurIdAndIsDeletedFalse(UUID porteurId);
+    // ============================================================
+    // 1. RECHERCHES UTILISATEUR (ce dont le front a vraiment besoin)
+    // ============================================================
 
-    List<Projet> findByPorteurIdAndStatutAndIsDeletedFalse(
-            UUID porteurId, String statut
-    );
-
-    // ── Recherche par statut ──────────────────────────────────
-    List<Projet> findByStatutAndIsDeletedFalse(String statut);
-
-    // Projets actifs non expirés — galerie page d accueil
-    @Query("SELECT p FROM Projet p WHERE p.statut = 'actif' " +
-            "AND p.isDeleted = false " +
-            "AND p.dateFin >= :today " +
-            "ORDER BY p.createdAt DESC")
+    /**
+     * Projets actifs pour la galerie (VALIDE + non expiré + non supprimé)
+     */
+    @Query("SELECT p FROM Projet p WHERE p.statut = 'VALIDE' " +
+            "AND p.isDeleted = false AND p.dateFin >= :today ORDER BY p.createdAt DESC")
     List<Projet> findProjetsActifs(@Param("today") LocalDate today);
 
-    // ── Recherche par domaine ─────────────────────────────────
-    @Query("SELECT p FROM Projet p WHERE p.statut = 'actif' " +
-            "AND p.isDeleted = false " +
-            "AND LOWER(p.domaine) = LOWER(:domaine) " +
-            "AND p.dateFin >= :today")
-    List<Projet> findByDomaine(
-            @Param("domaine") String domaine,
-            @Param("today") LocalDate today
-    );
+    /**
+     * Détail d'un projet (avec vérification existence)
+     */
+    Optional<Projet> findByIdAndIsDeletedFalse(UUID id);
 
-    // ── Recherche par titre ───────────────────────────────────
-    @Query("SELECT p FROM Projet p WHERE p.statut = 'actif' " +
-            "AND p.isDeleted = false " +
-            "AND LOWER(p.titre) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    List<Projet> searchByTitre(@Param("keyword") String keyword);
+    /**
+     * Vérifier si un projet est ouvert avant investissement
+     */
+    @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Projet p " +
+            "WHERE p.id = :id AND p.statut = 'VALIDE' AND p.isDeleted = false AND p.dateFin >= :today")
+    boolean estOuvert(@Param("id") UUID id, @Param("today") LocalDate today);
 
-    // ── Vérification timer — diagramme 5 ─────────────────────
-    @Query("SELECT p FROM Projet p WHERE p.id = :id " +
-            "AND p.statut = 'actif' " +
-            "AND p.isDeleted = false " +
-            "AND p.dateFin >= :today")
-    Optional<Projet> findProjetActifNonExpire(
-            @Param("id") UUID id,
-            @Param("today") LocalDate today
-    );
+    // ============================================================
+    // 2. RECHERCHES CREATEUR (dashboard créateur)
+    // ============================================================
 
-    // ── Mises à jour ──────────────────────────────────────────
+    /**
+     * Tous les projets du créateur (pour son dashboard)
+     */
+    List<Projet> findByPorteurIdAndIsDeletedFalse(UUID porteurId);
 
-    // Validation admin — activer le projet avec dates
+    /**
+     * Projets du créateur par statut (pour filtrage)
+     */
+    List<Projet> findByPorteurIdAndStatutAndIsDeletedFalse(UUID porteurId, StatutProjet statut);
+
+    // ============================================================
+    // 3. RECHERCHES ADMIN (gestion des projets)
+    // ============================================================
+
+    /**
+     * Projets en attente de validation
+     */
+    List<Projet> findByStatutAndIsDeletedFalse(StatutProjet statut);
+
+    // ============================================================
+    // 4. BARRE DE RECHERCHE (galerie)
+    // ============================================================
+
+    @Query("SELECT p FROM Projet p WHERE p.statut = 'VALIDE' AND p.isDeleted = false " +
+            "AND LOWER(p.titre) LIKE LOWER(CONCAT('%', :motCle, '%'))")
+    List<Projet> rechercherParTitre(@Param("motCle") String motCle);
+
+    // ============================================================
+    // 5. MISES À JOUR (transactionnelles)
+    // ============================================================
+
+    /**
+     * Admin valide un projet -> passe VALIDE + initialise dates
+     */
     @Modifying
     @Transactional
-    @Query("UPDATE Projet p SET p.statut = :statut, " +
-            "p.dateDebut = :dateDebut, p.dateFin = :dateFin " +
-            "WHERE p.id = :id")
-    int updateStatutEtDates(
-            @Param("id") UUID id,
-            @Param("statut") String statut,
-            @Param("dateDebut") LocalDate dateDebut,
-            @Param("dateFin") LocalDate dateFin
-    );
+    @Query("UPDATE Projet p SET p.statut = 'VALIDE', p.dateDebut = :dateDebut, p.dateFin = :dateFin " +
+            "WHERE p.id = :id AND p.statut = 'EN_ATTENTE'")
+    int valider(@Param("id") UUID id, @Param("dateDebut") LocalDate dateDebut, @Param("dateFin") LocalDate dateFin);
 
-    // Refus admin — changer statut uniquement
+    /**
+     * Admin refuse un projet
+     */
     @Modifying
     @Transactional
-    @Query("UPDATE Projet p SET p.statut = :statut WHERE p.id = :id")
-    int updateStatut(@Param("id") UUID id, @Param("statut") String statut);
+    @Query("UPDATE Projet p SET p.statut = 'REJETE' WHERE p.id = :id AND p.statut = 'EN_ATTENTE'")
+    int refuser(@Param("id") UUID id);
 
-    // Incrémenter montant_actuel après investissement validé
+    /**
+     * Ajouter un investissement (incrémente montant + clôture auto si objectif atteint)
+     */
     @Modifying
     @Transactional
     @Query("UPDATE Projet p SET p.montantActuel = p.montantActuel + :montant " +
-            "WHERE p.id = :id")
-    int incrementerMontantActuel(
-            @Param("id") UUID id,
-            @Param("montant") BigDecimal montant
-    );
+            "WHERE p.id = :id AND p.statut = 'VALIDE' AND p.dateFin >= :today")
+    int ajouterInvestissement(@Param("id") UUID id, @Param("montant") BigDecimal montant, @Param("today") LocalDate today);
 
-    // Suppression logique
+    /**
+     * Soft delete - suppression logique
+     */
     @Modifying
     @Transactional
     @Query("UPDATE Projet p SET p.isDeleted = true WHERE p.id = :id")
     int softDelete(@Param("id") UUID id);
 
-    // ── Statistiques ──────────────────────────────────────────
-    long countByStatutAndIsDeletedFalse(String statut);
+    // ============================================================
+    // 6. STATISTIQUES (dashboard admin)
+    // ============================================================
 
-    @Query("SELECT COUNT(p) FROM Projet p WHERE p.statut = 'actif' " +
-            "AND p.isDeleted = false AND p.dateFin >= :today")
-    long countProjetsActifs(@Param("today") LocalDate today);
+    /**
+     * Nombre total par statut
+     */
+    long countByStatutAndIsDeletedFalse(StatutProjet statut);
 
-    @Query("SELECT SUM(p.montantActuel) FROM Projet p WHERE p.isDeleted = false")
-    BigDecimal sumMontantTotal();
+    /**
+     * Montant total collecté
+     */
+    @Query("SELECT COALESCE(SUM(p.montantActuel), 0) FROM Projet p WHERE p.isDeleted = false")
+    BigDecimal montantTotalCollecte();
 
-    // Liste des domaines distincts — pour filtrage galerie
-    @Query("SELECT DISTINCT p.domaine FROM Projet p " +
-            "WHERE p.statut = 'actif' AND p.isDeleted = false")
-    List<String> findDomainesDistincts();
+    /**
+     * Liste des domaines pour filtrage
+     */
+    @Query("SELECT DISTINCT p.domaine FROM Projet p WHERE p.statut = 'VALIDE' AND p.isDeleted = false")
+    List<Projet.Domaine> findDomainesDistincts();
 }
