@@ -2,6 +2,8 @@ package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Commentaires;
 import com.ensias.crowdfunding_project.entities.Commentaires;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,17 +17,49 @@ import java.util.UUID;
 @Repository
 public interface CommentairesRepository extends JpaRepository<Commentaires, UUID> {
 
-    // Tous les commentaires d un projet — fiche projet
+    // ============================================================
+    // 1. RECHERCHES PAR PROJET
+    // ============================================================
+
+    /**
+     * Tous les commentaires d'un projet (triés du plus récent au plus ancien)
+     */
     List<Commentaires> findByProjetIdOrderByCreatedAtDesc(UUID projetId);
 
-    // Tous les commentaires d un utilisateur
-    List<Commentaires> findByAuteurIdOrderByCreatedAtDesc(UUID auteurId);
+    /**
+     * Commentaires d'un projet avec pagination (pour éviter de tout charger)
+     */
+    Page<Commentaires> findByProjetIdOrderByCreatedAtDesc(UUID projetId, Pageable pageable);
 
-    // Compter les commentaires d un projet
+    /**
+     * Nombre de commentaires d'un projet
+     */
     long countByProjetId(UUID projetId);
 
-    // Supprimer tous les commentaires d un projet
+    // ============================================================
+    // 2. RECHERCHES PAR AUTEUR
+    // ============================================================
+
+    /**
+     * Tous les commentaires d'un utilisateur (triés du plus récent au plus ancien)
+     */
+    List<Commentaires> findByAuteurIdOrderByCreatedAtDesc(UUID auteurId);
+
+    // ============================================================
+    // 3. SUPPRESSION
+    // ============================================================
+
+    /**
+     * Supprimer tous les commentaires d'un projet (quand le projet est supprimé)
+     */
     @Modifying
     @Transactional
     void deleteByProjetId(UUID projetId);
+
+    /**
+     * Supprimer un commentaire spécifique (vérification faite dans le service)
+     */
+    @Modifying
+    @Transactional
+    void deleteByIdAndAuteurId(UUID id, UUID auteurId);
 }
