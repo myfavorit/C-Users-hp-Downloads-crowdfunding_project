@@ -13,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(of = {"id", "url", "typeMedia", "createdAt"})
+@ToString  // ← Seulement @ToString, sans "of"
 public class Media {
 
     @Id
@@ -41,33 +41,7 @@ public class Media {
         this.createdAt = LocalDateTime.now();
     }
 
-    // ── Enum ─────────────────────────────────────────────────────────────
-
     public enum TypeMedia {
-        IMAGE,
-        VIDEO
-        // DOCUMENT supprimé car pas dans la contrainte SQL
-    }
-
-    // ── Méthodes métier ─────────────────────────────────────────────────
-
-    /**
-     * Vérifie si l'URL est valide
-     */
-    public boolean isUrlValide() {
-        return url != null && !url.isBlank() && (url.startsWith("http://") || url.startsWith("https://"));
-    }
-
-    /**
-     * Vérifie si le type de média est valide pour l'URL
-     * Exemple: une URL .mp4 ne peut pas être IMAGE
-     */
-    public boolean isTypeCoherent() {
-        if (typeMedia == TypeMedia.IMAGE) {
-            return url.toLowerCase().matches(".*\\.(jpg|jpeg|png|gif|webp)$");
-        } else if (typeMedia == TypeMedia.VIDEO) {
-            return url.toLowerCase().matches(".*\\.(mp4|webm|avi|mov)$");
-        }
-        return true;
+        IMAGE, VIDEO
     }
 }

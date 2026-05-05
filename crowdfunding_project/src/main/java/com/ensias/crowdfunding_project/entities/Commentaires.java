@@ -13,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(of = {"id", "contenu", "createdAt"})
+@ToString  // ← Seulement @ToString, sans "of"
 public class Commentaires {
 
     @Id
@@ -40,34 +40,5 @@ public class Commentaires {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-    }
-
-    // ── Méthodes métier ─────────────────────────────────────────────────
-
-    /**
-     * Vérifie si le contenu est valide (non vide)
-     */
-    public boolean isContenuValide() {
-        return contenu != null && !contenu.isBlank() && contenu.length() <= 2000;
-    }
-
-    /**
-     * Édite le contenu du commentaire
-     */
-    public void editer(String nouveauContenu) {
-        if (nouveauContenu == null || nouveauContenu.isBlank()) {
-            throw new IllegalArgumentException("Le contenu ne peut pas être vide");
-        }
-        if (nouveauContenu.length() > 2000) {
-            throw new IllegalArgumentException("Le contenu ne peut pas dépasser 2000 caractères");
-        }
-        this.contenu = nouveauContenu;
-    }
-
-    /**
-     * Vérifie si l'utilisateur est l'auteur du commentaire
-     */
-    public boolean estAuteur(UUID utilisateurId) {
-        return this.auteur.getId().equals(utilisateurId);
     }
 }
