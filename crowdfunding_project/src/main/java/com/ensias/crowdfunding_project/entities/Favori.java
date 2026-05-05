@@ -7,13 +7,19 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "FAVORI")
+@Table(
+        name = "FAVORI",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_favori_user_projet",
+                columnNames = {"utilisateur_id", "projet_id"}
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString  // ← Seulement @ToString, sans "of"
+@ToString
 public class Favori {
 
     @Id
@@ -37,5 +43,21 @@ public class Favori {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    // ── Méthodes métier ─────────────────────────────────────────────────
+
+    /**
+     * Vérifie si le favori est valide (utilisateur et projet non null)
+     */
+    public boolean estValide() {
+        return utilisateur != null && projet != null;
+    }
+
+    /**
+     * Vérifie si l'utilisateur est propriétaire du favori
+     */
+    public boolean estProprietaire(UUID utilisateurId) {
+        return this.utilisateur.getId().equals(utilisateurId);
     }
 }
