@@ -2,19 +2,21 @@ package com.ensias.crowdfunding_project.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "PROFIL_KYC")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class ProfilKyc {
 
     @Id
-    @GeneratedValue(generator = "uuid2")
-    @GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", columnDefinition = "BINARY(16)", updatable = false, nullable = false)
     private UUID id;
 
@@ -24,61 +26,85 @@ public class ProfilKyc {
             columnDefinition = "BINARY(16)")
     private Utilisateur utilisateur;
 
-    // ── Champs KYC — tous NOT NULL car soumis en une seule fois ──────────
-    // Le profil n'est créé en base QUE quand l'utilisateur soumet
-    // le formulaire complet (déclenché par action créer/investir)
-    @Column(name = "photo_profil", nullable = false, length = 255)
+    // ── Champs KYC ──────────────────────────────────────────────────────
+    @Column(name = "photo_profil", length = 255)
     private String photoProfil;
 
-    @Column(nullable = false, length = 255)
-    private String cin;
+    @Column(columnDefinition = "TEXT")
+    private String bio;
 
     @Column(nullable = false, length = 255)
     private String rib;
 
-    // ── Bio optionnelle ───────────────────────────────────────────────────
-    @Column(columnDefinition = "TEXT")
-    private String bio;
-
-    // ── État de validation ────────────────────────────────────────────────
-    // false  = soumis, en attente de validation admin
-    // true   = validé par admin → utilisateur peut agir
+    // ── État de validation ──────────────────────────────────────────────
     @Column(name = "kyc_valide", nullable = false)
     @Builder.Default
     private boolean kycValide = false;
 
-    // Rempli automatiquement à l'insertion (soumission du formulaire)
-    @Column(name = "kyc_soumis_at", nullable = false, updatable = false)
+    @Column(name = "kyc_soumis_at")
     private LocalDateTime kycSoumisAt;
 
-    // Rempli par l'admin au moment de la validation
     @Column(name = "kyc_valide_at")
     private LocalDateTime kycValideAt;
 
-    // Admin qui a validé le KYC
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "valide_par", columnDefinition = "BINARY(16)")
-    private Utilisateur validePar;
-
+    // ── Lifecycle ────────────────────────────────────────────────────────
     @PrePersist
     protected void onCreate() {
-        this.kycSoumisAt = LocalDateTime.now();
+        if (this.kycSoumisAt == null) {
+            this.kycSoumisAt = LocalDateTime.now();
+        }
     }
 
-    // ── Helpers métier ────────────────────────────────────────────────────
+    // ── Helpers métier ───────────────────────────────────────────────────
 
-    // Appelé par l'admin pour valider le KYC
-    public void valider(Utilisateur admin) {
-        this.kycValide   = true;
+    /**
+     * Valide le KYC
+     */
+    public void valider() {
+        if (this.kycValide) {
+            throw new IllegalStateException("Le KYC est déjà validé");
+        }
+        this.kycValide = true;
         this.kycValideAt = LocalDateTime.now();
-        this.validePar   = admin;
     }
 
-    // Appelé par l'admin pour rejeter — remet le profil en "à corriger"
+    /**
+     * Rejette le KYC - l'utilisateur devra resoumettre
+     */
     public void rejeter() {
-        this.kycValide   = false;
+        this.kycValide = false;
         this.kycValideAt = null;
-        this.validePar   = null;
-        this.kycSoumisAt = null; // l'utilisateur devra resoumettre
+        this.kycSoumisAt = null;
+    }
+
+    /**
+     * Vérifie si le KYC est validé
+     */
+    public boolean estValide() {
+        return this.kycValide;
+    }
+
+    /**
+     * Vérifie si le KYC est en attente de validation
+     */
+    public boolean estEnAttente() {
+        return !this.kycValide && this.kycSoumisAt != null;
+    }
+
+    /**
+     * Vérifie si l'utilisateur a déjà soumis un KYC
+     */
+    public boolean aEteSoumis() {
+        return this.kycSoumisAt != null;
+    }
+
+    @Override
+    public String toString() {
+        return "ProfilKyc{" +
+                "id=" + id +
+                ", utilisateurId=" + (utilisateur != null ? utilisateur.getId() : null) +
+                ", kycValide=" + kycValide +
+                ", kycSoumisAt=" + kycSoumisAt +
+                '}';
     }
 }
