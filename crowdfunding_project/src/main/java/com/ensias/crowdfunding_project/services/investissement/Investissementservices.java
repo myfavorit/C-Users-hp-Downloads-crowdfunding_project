@@ -1,4 +1,4 @@
-package com.ensias.crowdfunding_project.services.projet.investissement;
+package com.ensias.crowdfunding_project.services.investissement;
 
 public class Investissementservices {
 }
