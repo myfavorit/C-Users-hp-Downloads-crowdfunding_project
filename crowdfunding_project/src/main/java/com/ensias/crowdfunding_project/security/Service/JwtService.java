@@ -33,9 +33,7 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // ============================================================
     // 1. EXTRACTION
-    // ============================================================
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -63,9 +61,7 @@ public class JwtService {
                 .getPayload();
     }
 
-    // ============================================================
     // 2. GÉNÉRATION
-    // ============================================================
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
@@ -81,9 +77,7 @@ public class JwtService {
                 .compact();
     }
 
-    // ============================================================
     // 3. VALIDATION
-    // ============================================================
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         try {
@@ -118,9 +112,8 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    // ============================================================
+
     // 4. UTILITAIRES
-    // ============================================================
 
     public long getTimeRemaining(String token) {
         Date expiration = extractExpiration(token);
