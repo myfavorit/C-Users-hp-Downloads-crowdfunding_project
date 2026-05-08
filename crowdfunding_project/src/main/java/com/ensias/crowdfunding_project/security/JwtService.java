@@ -33,9 +33,7 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // ============================================================
     // 1. EXTRACTION
-    // ============================================================
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
