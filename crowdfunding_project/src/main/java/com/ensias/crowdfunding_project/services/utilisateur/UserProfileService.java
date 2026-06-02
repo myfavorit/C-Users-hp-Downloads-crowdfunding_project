@@ -112,7 +112,7 @@ public class UserProfileService {
 
         if (hasActiveInvestments) {
             anonymizeUser(user);
-            user.setStatut(StatutCompte.ANNULE);
+            //user.setStatut(StatutCompte.ANNULE);
             user.setDeleted(true);
             user.setUpdatedAt(LocalDateTime.now());
             utilisateurRepository.save(user);
