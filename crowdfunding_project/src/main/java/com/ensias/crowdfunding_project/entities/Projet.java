@@ -1,5 +1,7 @@
 package com.ensias.crowdfunding_project.entities;
 
+import com.ensias.crowdfunding_project.enums.DomaineProjet;
+import com.ensias.crowdfunding_project.enums.StatutProjet;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -40,7 +42,7 @@ public class Projet {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "domaine", nullable = false, length = 100)
-    private Domaine domaine;
+    private DomaineProjet domaine;
 
     @Column(name = "objectif_financier", nullable = false, precision = 15, scale = 2)
     private BigDecimal objectifFinancier;
@@ -92,7 +94,6 @@ public class Projet {
     }
 
     // ── Relations ─────────────────────────────────────────────────────────
-
     @OneToOne(mappedBy = "projet", fetch = FetchType.LAZY)
     private Validation validation;
 
@@ -112,22 +113,7 @@ public class Projet {
     @Builder.Default
     private List<Commentaires> commentaires = new ArrayList<>();
 
-    // ── Enums ─────────────────────────────────────────────────────────────
-
-    public enum StatutProjet {
-        BROUILLON, EN_ATTENTE, VALIDE, REJETE, CLOTURE, ANNULE
-    }
-
-    public enum Domaine {
-        TECHNOLOGIE, AGRICULTURE, SANTE, EDUCATION, COMMERCE,
-        IMMOBILIER, ENERGIE, TOURISME, INDUSTRIE, ART_CULTURE
-    }
-
     // ── Vérification ──────────────────────────────────────────────────────
-
-    /**
-     * Vérifie si le projet est complet et peut être soumis
-     */
     public boolean isComplet() {
         return titre != null && !titre.isBlank()
                 && description != null && !description.isBlank()
@@ -138,11 +124,7 @@ public class Projet {
                 && pourcentageOffert.compareTo(BigDecimal.valueOf(49)) <= 0));
     }
 
-    // ── Méthodes métier essentielles ──────────────────────────────────────
-
-    /**
-     * Soumettre le projet (BROUILLON → EN_ATTENTE)
-     */
+    // ── Méthodes métier ───────────────────────────────────────────────────
     public void soumettre() {
         if (this.statut != StatutProjet.BROUILLON) {
             throw new IllegalStateException("Seul un projet en brouillon peut être soumis");
@@ -153,9 +135,6 @@ public class Projet {
         this.statut = StatutProjet.EN_ATTENTE;
     }
 
-    /**
-     * Valider le projet (EN_ATTENTE → VALIDE) - par admin
-     */
     public void valider() {
         if (this.statut != StatutProjet.EN_ATTENTE) {
             throw new IllegalStateException("Seul un projet en attente peut être validé");
@@ -165,9 +144,6 @@ public class Projet {
         this.dateFin = this.dateDebut.plusDays(this.dureeJours);
     }
 
-    /**
-     * Refuser le projet (EN_ATTENTE → REJETE) - par admin
-     */
     public void refuser() {
         if (this.statut != StatutProjet.EN_ATTENTE) {
             throw new IllegalStateException("Seul un projet en attente peut être refusé");
@@ -175,11 +151,8 @@ public class Projet {
         this.statut = StatutProjet.REJETE;
     }
 
-    /**
-     * Annuler le projet (→ ANNULE) - par créateur
-     */
     public void annuler() {
-        if (this.statut == StatutProjet.CLOTURE) {
+        if (this.statut == StatutProjet.CLOTURE_SUCCES || this.statut == StatutProjet.ECHEC_REMBOURSE) {
             throw new IllegalStateException("Un projet clôturé ne peut pas être annulé");
         }
         if (this.montantActuel.compareTo(BigDecimal.ZERO) > 0) {
@@ -188,9 +161,6 @@ public class Projet {
         this.statut = StatutProjet.ANNULE;
     }
 
-    /**
-     * Ajouter un investissement
-     */
     public void ajouterInvestissement(BigDecimal montant) {
         if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant doit être positif");
@@ -205,13 +175,21 @@ public class Projet {
         this.montantActuel = this.montantActuel.add(montant);
 
         if (this.montantActuel.compareTo(this.objectifFinancier) >= 0) {
-            this.statut = StatutProjet.CLOTURE;
+            this.statut = StatutProjet.CLOTURE_SUCCES;
         }
     }
 
-    /**
-     * Vérifie si le projet est ouvert aux investissements
-     */
+    public void cloturer() {
+        if (this.statut != StatutProjet.VALIDE) {
+            throw new IllegalStateException("Seul un projet validé peut être clôturé");
+        }
+        if (isObjectifAtteint()) {
+            this.statut = StatutProjet.CLOTURE_SUCCES;
+        } else {
+            this.statut = StatutProjet.ECHEC_REMBOURSE;
+        }
+    }
+
     public boolean estOuvert() {
         return this.statut == StatutProjet.VALIDE
                 && !Boolean.TRUE.equals(this.isDeleted)
@@ -219,9 +197,14 @@ public class Projet {
                 && !LocalDate.now().isAfter(this.dateFin);
     }
 
-    /**
-     * Calcule le pourcentage de financement atteint
-     */
+    public boolean isEchec() {
+        return this.statut == StatutProjet.ECHEC_REMBOURSE;
+    }
+
+    public boolean isSucces() {
+        return this.statut == StatutProjet.CLOTURE_SUCCES;
+    }
+
     public BigDecimal getPourcentageFinancement() {
         if (objectifFinancier == null || objectifFinancier.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
@@ -231,19 +214,26 @@ public class Projet {
                 .divide(objectifFinancier, 2, java.math.RoundingMode.HALF_UP);
     }
 
-    /**
-     * Vérifie si le projet peut être supprimé physiquement (hard delete)
-     */
+    // ========== MÉTHODES UTILITAIRES ==========
+    public BigDecimal getMontantRestant() {
+        if (objectifFinancier == null) return BigDecimal.ZERO;
+        BigDecimal restant = objectifFinancier.subtract(montantActuel);
+        return restant.compareTo(BigDecimal.ZERO) > 0 ? restant : BigDecimal.ZERO;
+    }
+
+    public boolean isObjectifAtteint() {
+        return montantActuel != null && objectifFinancier != null &&
+                montantActuel.compareTo(objectifFinancier) >= 0;
+    }
+
     public boolean peutEtreSupprimePhysiquement() {
         return this.montantActuel.compareTo(BigDecimal.ZERO) == 0;
     }
 
-    /**
-     * Suppression logique (soft delete)
-     */
     public void softDelete() {
         this.isDeleted = true;
     }
+
     @Override
     public String toString() {
         return "Projet{" +

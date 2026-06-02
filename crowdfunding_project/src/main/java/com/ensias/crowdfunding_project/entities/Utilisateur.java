@@ -1,7 +1,11 @@
 package com.ensias.crowdfunding_project.entities;
 
+import com.ensias.crowdfunding_project.enums.RoleUtilisateur;
+import com.ensias.crowdfunding_project.enums.StatutCompte;
+
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +13,11 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "UTILISATEUR")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Utilisateur {
 
     @Id
@@ -32,13 +40,12 @@ public class Utilisateur {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private Role role = Role.INVESTOR;
-// Plus de valeur par défaut
+    private RoleUtilisateur role = RoleUtilisateur.INVESTOR;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private StatutCompte statut = StatutCompte.ACTIF;
+    private StatutCompte statut = StatutCompte.INACTIF;
 
     // --- OTP & OAuth ---
     @Column(name = "otp_code", length = 255)
@@ -53,6 +60,10 @@ public class Utilisateur {
     @Column(name = "oauth_id", length = 255)
     private String oauthId;
 
+    @Column(name = "otp_generation_count", nullable = false)
+    @Builder.Default
+    private int otpGenerationCount = 0;
+
     // --- Audit ---
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -60,9 +71,33 @@ public class Utilisateur {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "otp_attempts", nullable = false)
+    @Builder.Default
+    private int otpAttempts = 0;
+
+    /** Nombre de tentatives de connexion échouées consécutives */
+    @Column(name = "login_attempts", nullable = false)
+    private int loginAttempts = 0;
+
+    /** Date/heure jusqu'à laquelle le compte est verrouillé (null = non verrouillé) */
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    // --- Reset password ---
+    @Column(name = "reset_token", length = 255)
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
@@ -70,10 +105,9 @@ public class Utilisateur {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // --- Relations avec orphanRemoval ---
+    // --- Relations ---
     @OneToOne(mappedBy = "utilisateur", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private ProfilKyc profilKyc;
-
 
     @OneToMany(mappedBy = "porteur", fetch = FetchType.LAZY)
     @Builder.Default
@@ -95,47 +129,42 @@ public class Utilisateur {
     @Builder.Default
     private List<Commentaires> commentaires = new ArrayList<>();
 
-    // --- Enums Internes ---
-    public enum Role {
-        INVESTOR, PROJECT_CREATOR, ADMIN
-    }
-
-    public enum StatutCompte {
-        ACTIF, SUSPENDU, BANNI
-    }
+    // --- Enum interne (StatutCompte) ---
+    //public enum StatutCompte {
+    // ACTIF, INACTIF, SUSPENDU, BANNI
+    //}
 
     // --- Helpers Métier ---
-
     public boolean hasKycValide() {
         return profilKyc != null && profilKyc.isKycValide();
     }
 
     public boolean isAdmin() {
-        return this.role == Role.ADMIN;
+        return this.role == RoleUtilisateur.ADMIN;
     }
 
     public boolean isProjectCreator() {
-        return this.role == Role.PROJECT_CREATOR;
+        return this.role == RoleUtilisateur.PROJECT_CREATOR;
     }
 
     public boolean isInvestor() {
-        return this.role == Role.INVESTOR;
+        return this.role == RoleUtilisateur.INVESTOR;
     }
 
     public boolean peutInvestir() {
         return this.statut == StatutCompte.ACTIF
                 && hasKycValide()
-                && (this.role == Role.INVESTOR || this.role == Role.PROJECT_CREATOR);
+                && (this.role == RoleUtilisateur.INVESTOR || this.role == RoleUtilisateur.PROJECT_CREATOR);
     }
 
     public boolean peutCreerProjet() {
         return this.statut == StatutCompte.ACTIF
                 && hasKycValide()
-                && this.role == Role.PROJECT_CREATOR;
+                && this.role == RoleUtilisateur.PROJECT_CREATOR;
     }
 
     public boolean peutValiderKyc() {
-        return this.statut == StatutCompte.ACTIF && this.role == Role.ADMIN;
+        return this.statut == StatutCompte.ACTIF && this.role == RoleUtilisateur.ADMIN;
     }
 
     public boolean isKycEnAttente() {
@@ -165,4 +194,5 @@ public class Utilisateur {
                 ", statut=" + statut +
                 '}';
     }
+    // Ajouter dans l'entité Utilisateur.java
 }
