@@ -6,6 +6,4 @@ public enum StatutProjet {
     VALIDE,
     REJETE,
     CLOTURE_SUCCES,
-    ECHEC_REMBOURSE,
-    ANNULE
 }

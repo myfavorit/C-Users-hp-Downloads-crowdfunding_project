@@ -131,7 +131,7 @@ public class Utilisateur {
 
     // --- Enum interne (StatutCompte) ---
     //public enum StatutCompte {
-       // ACTIF, INACTIF, SUSPENDU, BANNI
+    // ACTIF, INACTIF, SUSPENDU, BANNI
     //}
 
     // --- Helpers Métier ---
