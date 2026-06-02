@@ -3,6 +3,7 @@ package com.ensias.crowdfunding_project.services.investissement;
 import com.ensias.crowdfunding_project.dto.investissement.InvestissementRequest;
 import com.ensias.crowdfunding_project.dto.investissement.InvestissementResponse;
 import com.ensias.crowdfunding_project.entities.*;
+import com.ensias.crowdfunding_project.enums.StatutPaiement;
 import com.ensias.crowdfunding_project.repositories.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -83,7 +84,7 @@ public class InvestissementService {
                                 : Investissement.ModePaiement.SIMULATION
                 )
                 .referencePaiement(reference)
-                .statutPaiement(Investissement.StatutPaiement.EN_ATTENTE)
+                .statutPaiement(StatutPaiement.EN_ATTENTE)
                 .build();
 
         // 9. Save investment
