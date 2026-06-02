@@ -1,7 +1,8 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Projet;
-import com.ensias.crowdfunding_project.entities.Projet.StatutProjet;
+import com.ensias.crowdfunding_project.enums.DomaineProjet;
+import com.ensias.crowdfunding_project.enums.StatutProjet;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,7 +20,7 @@ import java.util.UUID;
 public interface ProjetRepository extends JpaRepository<Projet, UUID> {
 
     // ============================================================
-    // 1. RECHERCHES UTILISATEUR (ce dont le front a vraiment besoin)
+    // RECHERCHES UTILISATEUR (galerie)
     // ============================================================
 
     /**
@@ -42,11 +43,11 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     boolean estOuvert(@Param("id") UUID id, @Param("today") LocalDate today);
 
     // ============================================================
-    // 2. RECHERCHES CREATEUR (dashboard créateur)
+    // RECHERCHES CRÉATEUR (dashboard)
     // ============================================================
 
     /**
-     * Tous les projets du créateur (pour son dashboard)
+     * Tous les projets du créateur (non supprimés)
      */
     List<Projet> findByPorteurIdAndIsDeletedFalse(UUID porteurId);
 
@@ -56,16 +57,16 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     List<Projet> findByPorteurIdAndStatutAndIsDeletedFalse(UUID porteurId, StatutProjet statut);
 
     // ============================================================
-    // 3. RECHERCHES ADMIN (gestion des projets)
+    // RECHERCHES ADMIN (gestion des projets)
     // ============================================================
 
     /**
-     * Projets en attente de validation
+     * Projets en attente de validation (statut = EN_ATTENTE)
      */
     List<Projet> findByStatutAndIsDeletedFalse(StatutProjet statut);
 
     // ============================================================
-    // 4. BARRE DE RECHERCHE (galerie)
+    // BARRE DE RECHERCHE (galerie)
     // ============================================================
 
     @Query("SELECT p FROM Projet p WHERE p.statut = 'VALIDE' AND p.isDeleted = false " +
@@ -73,7 +74,7 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     List<Projet> rechercherParTitre(@Param("motCle") String motCle);
 
     // ============================================================
-    // 5. MISES À JOUR (transactionnelles)
+    // MISES À JOUR (transactionnelles)
     // ============================================================
 
     /**
@@ -83,7 +84,9 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     @Transactional
     @Query("UPDATE Projet p SET p.statut = 'VALIDE', p.dateDebut = :dateDebut, p.dateFin = :dateFin " +
             "WHERE p.id = :id AND p.statut = 'EN_ATTENTE'")
-    int valider(@Param("id") UUID id, @Param("dateDebut") LocalDate dateDebut, @Param("dateFin") LocalDate dateFin);
+    int valider(@Param("id") UUID id,
+                @Param("dateDebut") LocalDate dateDebut,
+                @Param("dateFin") LocalDate dateFin);
 
     /**
      * Admin refuse un projet
@@ -100,7 +103,9 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     @Transactional
     @Query("UPDATE Projet p SET p.montantActuel = p.montantActuel + :montant " +
             "WHERE p.id = :id AND p.statut = 'VALIDE' AND p.dateFin >= :today")
-    int ajouterInvestissement(@Param("id") UUID id, @Param("montant") BigDecimal montant, @Param("today") LocalDate today);
+    int ajouterInvestissement(@Param("id") UUID id,
+                              @Param("montant") BigDecimal montant,
+                              @Param("today") LocalDate today);
 
     /**
      * Soft delete - suppression logique
@@ -111,7 +116,7 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
     int softDelete(@Param("id") UUID id);
 
     // ============================================================
-    // 6. STATISTIQUES (dashboard admin)
+    // STATISTIQUES (dashboard admin)
     // ============================================================
 
     /**
@@ -129,5 +134,5 @@ public interface ProjetRepository extends JpaRepository<Projet, UUID> {
      * Liste des domaines pour filtrage
      */
     @Query("SELECT DISTINCT p.domaine FROM Projet p WHERE p.statut = 'VALIDE' AND p.isDeleted = false")
-    List<Projet.Domaine> findDomainesDistincts();
+    List<DomaineProjet> findDomainesDistincts();
 }
