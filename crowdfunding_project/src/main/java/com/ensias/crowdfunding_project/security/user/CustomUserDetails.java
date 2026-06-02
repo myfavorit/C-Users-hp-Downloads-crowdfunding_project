@@ -20,8 +20,8 @@ public class CustomUserDetails implements UserDetails {
     public CustomUserDetails(Utilisateur utilisateur) {
         this.id = utilisateur.getId();
         this.email = utilisateur.getEmail();
-        this.password = utilisateur.getMotDePasseHash() != null ? utilisateur.getMotDePasseHash() : "OAUTH_USER_NO_PASSWORD";
-        this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + utilisateur.getRole().name()));
+        this.password = utilisateur.getMotDePasseHash() != null ? utilisateur.getMotDePasseHash() : "OAUTH_USER_NOPASSWORD";
+        this.authorities = List.of(new SimpleGrantedAuthority("ROLE" + utilisateur.getRole().name()));
     }
 
     @Override
