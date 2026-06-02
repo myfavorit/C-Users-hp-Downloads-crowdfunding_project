@@ -81,7 +81,7 @@ public class Projet {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
+    //initialisation du updatedAT en meme temps de la creation
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -234,15 +234,8 @@ public class Projet {
         this.isDeleted = true;
     }
 
-    @Override
-    public String toString() {
-        return "Projet{" +
-                "id=" + id +
-                ", titre='" + titre + '\'' +
-                ", domaine=" + domaine +
-                ", statut=" + statut +
-                ", montantActuel=" + montantActuel +
-                ", objectifFinancier=" + objectifFinancier +
-                '}';
+
+    public Comparable<BigDecimal> getObjectifFinancement() {
+        return this.objectifFinancier;
     }
 }
