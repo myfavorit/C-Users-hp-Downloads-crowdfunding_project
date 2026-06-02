@@ -1,8 +1,8 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Utilisateur;
-import com.ensias.crowdfunding_project.entities.Utilisateur.Role;
-import com.ensias.crowdfunding_project.entities.Utilisateur.StatutCompte;
+import com.ensias.crowdfunding_project.enums.RoleUtilisateur;
+import com.ensias.crowdfunding_project.enums.StatutCompte;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -34,25 +34,27 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     );
 
     // Recherche par rôle
-    List<Utilisateur> findByRole(Role role);  // ← CORRIGÉ (sans "All")
+    List<Utilisateur> findByRole(RoleUtilisateur role);  // ← CORRIGÉ (sans "All")
 
     // Recherche par statut
     List<Utilisateur> findByStatut(StatutCompte statut);
 
     // Recherche par email ET rôle — vérification accès
-    Optional<Utilisateur> findByEmailAndRole(String email, Role role);
+    Optional<Utilisateur> findByEmailAndRole(String email, RoleUtilisateur role);
 
+    // rechercher par resettoken
+    Optional<Utilisateur> findByResetToken(String resetToken);
     // ── 2. RECHERCHES AVEC PAGINATION ─────────────────────────
 
     // Pagination par rôle
-    Page<Utilisateur> findByRole(Role role, Pageable pageable);
+    Page<Utilisateur> findByRole(RoleUtilisateur role, Pageable pageable);
 
     // Pagination par statut
     Page<Utilisateur> findByStatut(StatutCompte statut, Pageable pageable);
 
     // Pagination par rôle ET statut — le plus utilisé
     Page<Utilisateur> findByRoleAndStatut(
-            Role role, StatutCompte statut, Pageable pageable
+            RoleUtilisateur role, StatutCompte statut, Pageable pageable
     );
 
     // ── 3. RECHERCHE PAR OTP ──────────────────────────────────
@@ -85,6 +87,7 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
             @Param("search") String search, Pageable pageable
     );
 
+
     // ── 5. GESTION KYC ────────────────────────────────────────
 
     // Utilisateurs avec KYC validé
@@ -100,7 +103,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     List<Utilisateur> findUsersWithPendingKyc();
 
     // ── 6. MISES À JOUR ───────────────────────────────────────
-
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.statut = :statut WHERE u.id = :id")
@@ -109,17 +111,28 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.role = :role WHERE u.id = :id")
-    int updateRole(@Param("id") UUID id, @Param("role") Role role);
+    int updateRole(@Param("id") UUID id, @Param("role") RoleUtilisateur role);
 
+    // Seul clearOtp avec remise à zéro des tentatives
     @Modifying
     @Transactional
-    @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null WHERE u.id = :id")
+    @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null, u.otpAttempts = 0 WHERE u.id = :id")
     int clearOtp(@Param("id") UUID id);
 
     @Modifying
     @Transactional
     @Query("UPDATE Utilisateur u SET u.motDePasseHash = :hash WHERE u.id = :id")
     int updateMotDePasse(@Param("id") UUID id, @Param("hash") String hash);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Utilisateur u SET u.otpGenerationCount = u.otpGenerationCount + 1 WHERE u.id = :id")
+    int incrementOtpGenerationCount(@Param("id") UUID id);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Utilisateur u SET u.otpGenerationCount = 0 WHERE u.id = :id")
+    int resetOtpGenerationCount(@Param("id") UUID id);
 
     // ── 7. STATISTIQUES ───────────────────────────────────────
 
@@ -128,9 +141,11 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
             "FROM Utilisateur u GROUP BY u.role")
     List<RoleCount> countUsersByRole();
 
+    long countByStatut(StatutCompte statutCompte);
+
     // Interface de projection
     interface RoleCount {
-        Role getRole();
+        RoleUtilisateur getRole();
         Long getTotal();
     }
 
@@ -141,4 +156,25 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> 
     @Transactional
     @Query("UPDATE Utilisateur u SET u.otpCode = null, u.otpExpiration = null WHERE u.otpExpiration < :now")
     int clearExpiredOtps(@Param("now") LocalDateTime now);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Utilisateur u SET u.otpAttempts = u.otpAttempts + 1 WHERE u.id = :id")
+    int incrementOtpAttempts(@Param("id") UUID id);
+
+    /** Incrémente le compteur d'échecs de connexion */
+    @Modifying
+    @Query("UPDATE Utilisateur u SET u.loginAttempts = u.loginAttempts + 1 WHERE u.email = :email")
+    void incrementLoginAttempts(@Param("email") String email);
+
+    /** Remet à zéro le compteur et efface le verrou */
+    @Modifying
+    @Query("UPDATE Utilisateur u SET u.loginAttempts = 0, u.lockedUntil = null WHERE u.email = :email")
+    void resetLoginAttempts(@Param("email") String email);
+
+    /** Verrouille le compte jusqu'à une date donnée */
+    @Modifying
+    @Query("UPDATE Utilisateur u SET u.lockedUntil = :until WHERE u.email = :email")
+    void lockUntil(@Param("email") String email, @Param("until") LocalDateTime until);
+
 }
