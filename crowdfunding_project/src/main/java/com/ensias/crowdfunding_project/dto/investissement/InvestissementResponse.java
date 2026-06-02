@@ -1,6 +1,8 @@
 package com.ensias.crowdfunding_project.dto.investissement;
 
 import com.ensias.crowdfunding_project.entities.Investissement;
+import com.ensias.crowdfunding_project.enums.StatutPaiement;
+
 import lombok.Builder;
 import lombok.Getter;
 
@@ -32,7 +34,7 @@ public class InvestissementResponse {
     private BigDecimal partInvestisseur;
 
     // Payment info
-    private Investissement.StatutPaiement statutPaiement;
+    private StatutPaiement statutPaiement;
     private String referencePaiement;
     private Investissement.ModePaiement modePaiement;
 
@@ -77,3 +79,4 @@ public class InvestissementResponse {
                 .build();
     }
 }
+
