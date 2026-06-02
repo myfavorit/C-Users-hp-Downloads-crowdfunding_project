@@ -1,7 +1,7 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Notification;
-import com.ensias.crowdfunding_project.entities.Notification.TypeNotification;
+import com.ensias.crowdfunding_project.enums.TypeNotification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -102,4 +102,6 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
      * Compter le total des notifications d'un utilisateur
      */
     long countByDestinataireId(UUID destinataireId);
+
+    void deleteAllByDestinataireId(UUID utilisateurId);
 }

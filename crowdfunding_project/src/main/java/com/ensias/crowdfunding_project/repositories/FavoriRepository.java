@@ -1,6 +1,7 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Favori;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -48,4 +49,10 @@ public interface FavoriRepository extends JpaRepository<Favori, UUID> {
      * Supprimer tous les favoris d'un utilisateur (quand compte supprimé)
      */
     void deleteByUtilisateurId(UUID utilisateurId);
+
+    // ====== // ── Nouveaux ───────────────────────────────────────────────
+    long countByUtilisateurId(UUID utilisateurId);
+
+    @Query("SELECT f FROM Favori f JOIN FETCH f.projet WHERE f.utilisateur.id = :utilisateurId ORDER BY f.createdAt DESC")
+    List<Favori> findTop5ByUtilisateurIdOrderByCreatedAtDesc(@Param("utilisateurId") UUID utilisateurId, Pageable pageable);
 }

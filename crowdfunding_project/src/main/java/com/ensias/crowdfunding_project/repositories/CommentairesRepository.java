@@ -17,9 +17,8 @@ import java.util.UUID;
 @Repository
 public interface CommentairesRepository extends JpaRepository<Commentaires, UUID> {
 
-    // ============================================================
     // 1. RECHERCHES PAR PROJET
-    // ============================================================
+
 
     /**
      * Tous les commentaires d'un projet (triés du plus récent au plus ancien)
@@ -36,18 +35,16 @@ public interface CommentairesRepository extends JpaRepository<Commentaires, UUID
      */
     long countByProjetId(UUID projetId);
 
-    // ============================================================
     // 2. RECHERCHES PAR AUTEUR
-    // ============================================================
+
 
     /**
      * Tous les commentaires d'un utilisateur (triés du plus récent au plus ancien)
      */
     List<Commentaires> findByAuteurIdOrderByCreatedAtDesc(UUID auteurId);
 
-    // ============================================================
     // 3. SUPPRESSION
-    // ============================================================
+
 
     /**
      * Supprimer tous les commentaires d'un projet (quand le projet est supprimé)

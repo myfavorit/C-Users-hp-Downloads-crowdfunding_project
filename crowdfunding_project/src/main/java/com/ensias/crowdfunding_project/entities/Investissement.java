@@ -1,5 +1,6 @@
 package com.ensias.crowdfunding_project.entities;
 
+import com.ensias.crowdfunding_project.enums.StatutPaiement;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -63,11 +64,12 @@ public class Investissement {
 
     // ── Enums ─────────────────────────────────────────────────────────────
 
-    public enum StatutPaiement {
+    /*public enum StatutPaiement {
         EN_ATTENTE,
         CONFIRME,
-        ECHOUE
-    }
+        ECHOUE,
+        REMBOUSE
+    }*/
 
     public enum ModePaiement {
         SIMULATION,

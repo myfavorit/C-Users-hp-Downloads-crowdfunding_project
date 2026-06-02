@@ -1,8 +1,8 @@
 package com.ensias.crowdfunding_project.entities;
 
+import com.ensias.crowdfunding_project.enums.TypeNotification;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -50,7 +50,7 @@ public class Notification {
 
     // ── Enum ─────────────────────────────────────────────────────────────
 
-    public enum TypeNotification {
+    /*public enum TypeNotification {
         PROJET_VALIDE,
         PROJET_REJETE,
         INVESTISSEMENT_RECU,
@@ -59,7 +59,7 @@ public class Notification {
         REMBOURSEMENT,
         SYSTEME
     }
-
+*/
     // ── Méthodes métier ─────────────────────────────────────────────────
 
     /**

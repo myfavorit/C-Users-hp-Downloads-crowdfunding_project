@@ -1,7 +1,7 @@
 package com.ensias.crowdfunding_project.repositories;
 
 import com.ensias.crowdfunding_project.entities.Investissement;
-import com.ensias.crowdfunding_project.entities.Investissement.StatutPaiement;
+import com.ensias.crowdfunding_project.enums.StatutPaiement;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -133,4 +133,69 @@ public interface InvestissementRepository extends JpaRepository<Investissement, 
             "GROUP BY i.investisseur.id " +
             "ORDER BY SUM(i.montant) DESC")
     Page<InvestisseurStats> findTopInvestisseursByMontant(Pageable pageable);
+
+    // Montant moyen par investissement (uniquement les confirmés)
+    @Query("SELECT COALESCE(AVG(i.montant), 0) FROM Investissement i WHERE i.statutPaiement = 'CONFIRME'")
+    BigDecimal avgMontantInvestissement();
+
+    // Nombre d'investisseurs distincts (utilisateurs ayant au moins un investissement confirmé)
+    @Query("SELECT COUNT(DISTINCT i.investisseur.id) FROM Investissement i WHERE i.statutPaiement = 'CONFIRME'")
+    long countDistinctInvestisseurs();
+
+    //========================AJOUTER POUR LE SERVCE UTILISATEUR a partir de ce stade
+    boolean existsByInvestisseurIdAndStatutPaiement(UUID investisseurId, StatutPaiement statut);
+    // Dans InvestissementRepository.java
+
+    // Compter les investissements confirmés d’un investisseur
+    long countByInvestisseurIdAndStatutPaiement(UUID investisseurId, StatutPaiement statut);
+
+    // Récupérer les 5 derniers investissements confirmés d’un investisseur
+    List<Investissement> findTop5ByInvestisseurIdAndStatutPaiementOrderByCreatedAtDesc(
+            UUID investisseurId, StatutPaiement statut, Pageable pageable);
+    // Nombre de projets distincts dans lesquels un investisseur a investi
+    @Query("SELECT COUNT(DISTINCT i.projet.id) FROM Investissement i " +
+            "WHERE i.investisseur.id = :userId AND i.statutPaiement = :statut")
+    long countDistinctProjetByInvestisseurIdAndStatutPaiement(
+            @Param("userId") UUID userId,
+            @Param("statut") StatutPaiement statut);
+
+    // Évolution mensuelle des investissements (somme et nombre)
+    @Query("""
+    SELECT MONTH(i.createdAt), YEAR(i.createdAt), SUM(i.montant), COUNT(i.id)
+    FROM Investissement i
+    WHERE i.investisseur.id = :userId AND i.statutPaiement = :statut
+    GROUP BY YEAR(i.createdAt), MONTH(i.createdAt)
+    ORDER BY YEAR(i.createdAt), MONTH(i.createdAt)
+    """)
+    List<Object[]> findEvolutionMensuelle(
+            @Param("userId") UUID userId,
+            @Param("statut") StatutPaiement statut);
+
+    // Répartition des montants investis par projet (pour graphe donut)
+    @Query("""
+    SELECT i.projet.id, SUM(i.montant), i.projet.titre
+    FROM Investissement i
+    WHERE i.investisseur.id = :userId AND i.statutPaiement = :statut
+    GROUP BY i.projet.id, i.projet.titre
+    ORDER BY SUM(i.montant) DESC
+    """)
+    List<Object[]> findRepartitionParProjet(
+            @Param("userId") UUID userId,
+            @Param("statut") StatutPaiement statut);
+
+    /**
+     * 5 derniers investissements reçus sur les projets du créateur.
+     */
+    @Query("""
+    SELECT i
+    FROM Investissement i
+    JOIN i.projet p
+    WHERE p.porteur.id  = :porteurId
+      AND i.statutPaiement = :statut
+    ORDER BY i.createdAt DESC
+    """)
+    List<Investissement> findTop5RecusByPorteurId(
+            @Param("porteurId") UUID porteurId,
+            @Param("statut")    StatutPaiement statut,
+            Pageable pageable);
 }
